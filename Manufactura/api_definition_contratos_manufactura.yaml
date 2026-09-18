@@ -1,0 +1,273 @@
+# Propuesta CC6 Rol B Manufactura. Mejoras y pendientes documentados en info.description y README.
+"openapi": "3.0.3"
+"info":
+  "title": "Contratos de Manufactura — CC6 Rol B"
+  "version": "1.0.0-propuesta"
+  "description": "Propuesta para discusión, no acuerdo intergrupal aprobado. Se adoptan IDs integer, GET de colección, componentes reutilizables, errores code/message, 422 para referencias inválidas y Location al crear recursos. El contrato no contiene product_id, product_title ni release_date; incluye vigencia obligatoria. PUT se difiere hasta acordar su alcance. Idioma, estados, JWT, PUT y timestamps pendientes."
+  "x-pendientes-intergrupales":
+    - "Idioma definitivo de campos y mensajes"
+    - "Estados definitivos y transiciones"
+    - "Obligatoriedad de JWT y emisor/validación"
+    - "Alcance de PUT"
+    - "Inclusión y obligatoriedad de timestamps"
+"servers":
+  -
+    "url": "https://manufactura.example.com/api"
+    "description": "URL ilustrativa; reemplazar por la base real del nodo propietario."
+"security": []
+"paths":
+  "/contrato_manufactura":
+    "get":
+      "operationId": "listContratoManufactura"
+      "summary": "Listar contratos"
+      "description": "Devuelve [] si no hay coincidencias. Filtros combinados con AND; referencia inexistente: 422. Sin paginación en este borrador."
+      "responses":
+        "200":
+          "description": "Operación correcta."
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "items":
+                  "$ref": "#/components/schemas/ContratoManufactura"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "422":
+          "$ref": "#/components/responses/InvalidReference"
+        "500":
+          "$ref": "#/components/responses/InternalServerError"
+      "parameters":
+        -
+          "$ref": "#/components/parameters/ManufacturerIdQuery"
+        -
+          "$ref": "#/components/parameters/ClientIdQuery"
+        -
+          "$ref": "#/components/parameters/StatusQuery"
+    "post":
+      "operationId": "postContratoManufactura"
+      "summary": "Crear contrato"
+      "description": "El servidor asigna contract_id y estado inicial DRAFT. start_date <= end_date; fechas inclusivas. manufacturer_id y client_id deben existir. product_id se rechaza como campo no permitido. Creación atómica."
+      "responses":
+        "201":
+          "description": "Operación correcta."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ContratoManufactura"
+          "headers":
+            "Location":
+              "$ref": "#/components/headers/Location"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "409":
+          "$ref": "#/components/responses/Conflict"
+        "422":
+          "$ref": "#/components/responses/InvalidReference"
+        "500":
+          "$ref": "#/components/responses/InternalServerError"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/ContratoManufacturaRequest"
+  "/contrato_manufactura/{contract_id}":
+    "parameters":
+      -
+        "$ref": "#/components/parameters/ContractId"
+    "get":
+      "operationId": "getContratoManufactura"
+      "summary": "Obtener contrato"
+      "description": "Obtener contrato"
+      "responses":
+        "200":
+          "description": "Operación correcta."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ContratoManufactura"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalServerError"
+"components":
+  "schemas":
+    "Id":
+      "type": "integer"
+      "format": "int64"
+      "minimum": 1
+      "maximum": 9007199254740991
+      "description": "ID numérico positivo asignado por el sistema propietario; límite interoperable exacto en JavaScript."
+    "Error":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "code"
+        - "message"
+      "properties":
+        "code":
+          "type": "string"
+          "minLength": 1
+        "message":
+          "type": "string"
+          "minLength": 1
+    "ContractStatus":
+      "type": "string"
+      "enum":
+        - "DRAFT"
+        - "ACTIVE"
+        - "SUSPENDED"
+        - "EXPIRED"
+        - "TERMINATED"
+        - "CANCELLED"
+      "description": "Vocabulario provisional tomado de Eventos; transiciones pendientes."
+    "ContratoManufacturaRequest":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "manufacturer_id"
+        - "client_id"
+        - "start_date"
+        - "end_date"
+        - "contract_terms"
+      "properties":
+        "manufacturer_id":
+          "$ref": "#/components/schemas/Id"
+        "client_id":
+          "$ref": "#/components/schemas/Id"
+        "start_date":
+          "type": "string"
+          "format": "date"
+        "end_date":
+          "type": "string"
+          "format": "date"
+        "contract_terms":
+          "type": "string"
+          "minLength": 1
+    "ContratoManufactura":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "contract_id"
+        - "manufacturer_id"
+        - "client_id"
+        - "start_date"
+        - "end_date"
+        - "contract_terms"
+        - "status"
+      "properties":
+        "contract_id":
+          "$ref": "#/components/schemas/Id"
+        "manufacturer_id":
+          "$ref": "#/components/schemas/Id"
+        "client_id":
+          "$ref": "#/components/schemas/Id"
+        "start_date":
+          "type": "string"
+          "format": "date"
+        "end_date":
+          "type": "string"
+          "format": "date"
+        "contract_terms":
+          "type": "string"
+          "minLength": 1
+        "status":
+          "$ref": "#/components/schemas/ContractStatus"
+  "parameters":
+    "ContractId":
+      "name": "contract_id"
+      "in": "path"
+      "required": true
+      "description": "ID del contrato en este nodo."
+      "schema":
+        "$ref": "#/components/schemas/Id"
+    "ManufacturerIdQuery":
+      "name": "manufacturer_id"
+      "in": "query"
+      "required": false
+      "description": "Filtrar por fabricante existente."
+      "schema":
+        "$ref": "#/components/schemas/Id"
+    "ClientIdQuery":
+      "name": "client_id"
+      "in": "query"
+      "required": false
+      "description": "Filtrar por cliente existente."
+      "schema":
+        "$ref": "#/components/schemas/Id"
+    "StatusQuery":
+      "name": "status"
+      "in": "query"
+      "required": false
+      "description": "Estado provisional."
+      "schema":
+        "$ref": "#/components/schemas/ContractStatus"
+  "responses":
+    "BadRequest":
+      "description": "JSON, tipos, campos o rango de fechas inválidos."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "BAD_REQUEST"
+            "message": "JSON, tipos, campos o rango de fechas inválidos."
+    "Unauthorized":
+      "description": "Solo aplica si se acuerda exigir autenticación."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "UNAUTHORIZED"
+            "message": "Solo aplica si se acuerda exigir autenticación."
+    "NotFound":
+      "description": "El recurso solicitado por su ruta no existe."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "NOT_FOUND"
+            "message": "El recurso solicitado por su ruta no existe."
+    "Conflict":
+      "description": "Conflicto con el estado o las reglas comerciales."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "CONFLICT"
+            "message": "Conflicto con el estado o las reglas comerciales."
+    "InvalidReference":
+      "description": "Una referencia no existe o no pertenece a la entidad indicada."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "INVALID_REFERENCE"
+            "message": "Una referencia no existe o no pertenece a la entidad indicada."
+    "InternalServerError":
+      "description": "Error interno sin exponer detalles técnicos."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "INTERNAL_SERVER_ERROR"
+            "message": "Error interno sin exponer detalles técnicos."
+  "headers":
+    "Location":
+      "description": "URI relativa del recurso creado, resoluble desde el origen del servidor. Debe incluir el prefijo real de la API."
+      "schema":
+        "type": "string"
+      "example": "/api/contrato_manufactura/1001"
+  "securitySchemes":
+    "bearerAuth":
+      "type": "http"
+      "scheme": "bearer"
+      "bearerFormat": "JWT"
+      "description": "Definición preparada. No se exige en este borrador; pendiente de acuerdo."
