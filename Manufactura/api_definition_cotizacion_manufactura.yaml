@@ -1,0 +1,292 @@
+# Propuesta CC6 Rol B Manufactura. Mejoras y pendientes documentados en info.description y README.
+"openapi": "3.0.3"
+"info":
+  "title": "Cotizaciones de Manufactura — CC6 Rol B"
+  "version": "1.0.0-propuesta"
+  "description": "Propuesta para discusión, no acuerdo intergrupal aprobado. Se adoptan IDs integer, GET de colección, componentes reutilizables, errores code/message, 422 para referencias inválidas y Location al crear recursos. Cada cotización pertenece a un contrato y contiene uno o más productos en items. Un contrato admite muchas cotizaciones. Los pedidos se modelan conceptualmente y quedan fuera de estas rutas. Idioma, estados, JWT, PUT y timestamps pendientes."
+  "x-pendientes-intergrupales":
+    - "Idioma definitivo de campos y mensajes"
+    - "Estados definitivos y transiciones"
+    - "Obligatoriedad de JWT y emisor/validación"
+    - "Alcance de PUT"
+    - "Inclusión y obligatoriedad de timestamps"
+"servers":
+  -
+    "url": "https://manufactura.example.com/api"
+    "description": "URL ilustrativa; reemplazar por la base real del nodo propietario."
+"security": []
+"paths":
+  "/cotizacion_manufactura":
+    "get":
+      "operationId": "listCotizacionManufactura"
+      "summary": "Listar cotizaciones"
+      "description": "Filtros AND; [] sin coincidencias. contract_id inexistente: 422. Sin paginación en este borrador."
+      "responses":
+        "200":
+          "description": "Operación correcta."
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "items":
+                  "$ref": "#/components/schemas/CotizacionManufactura"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "422":
+          "$ref": "#/components/responses/InvalidReference"
+        "500":
+          "$ref": "#/components/responses/InternalServerError"
+      "parameters":
+        -
+          "$ref": "#/components/parameters/ContractIdQuery"
+        -
+          "$ref": "#/components/parameters/StatusQuery"
+    "post":
+      "operationId": "postCotizacionManufactura"
+      "summary": "Crear cotización con varios productos"
+      "description": "Creación atómica: si falla una línea no se crea ninguna. Contrato inexistente o producto inexistente/ajeno al fabricante del contrato: 422. Contrato no ACTIVE o fuera de vigencia, producto inactivo o monedas diferentes: 409. product_id repetido: 400; consolidar cantidades antes de enviar. El servidor asigna quotation_id, estado DRAFT y precios actuales como instantánea; subtotal = quantity * unit_price y total = suma de subtotales, con aritmética decimal de dos posiciones. No incluye impuestos, descuentos ni envío en este borrador. La cotización no descuenta ni reserva inventario; un pedido posterior debe validar disponibilidad de nuevo. Fecha comercial del nodo usada para vigencia: zona horaria a acordar."
+      "responses":
+        "201":
+          "description": "Operación correcta."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/CotizacionManufactura"
+          "headers":
+            "Location":
+              "$ref": "#/components/headers/Location"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "409":
+          "$ref": "#/components/responses/Conflict"
+        "422":
+          "$ref": "#/components/responses/InvalidReference"
+        "500":
+          "$ref": "#/components/responses/InternalServerError"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/CotizacionManufacturaRequest"
+  "/cotizacion_manufactura/{quotation_id}":
+    "parameters":
+      -
+        "$ref": "#/components/parameters/QuotationId"
+    "get":
+      "operationId": "getCotizacionManufactura"
+      "summary": "Obtener cotización"
+      "description": "Obtener cotización"
+      "responses":
+        "200":
+          "description": "Operación correcta."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/CotizacionManufactura"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalServerError"
+"components":
+  "schemas":
+    "Id":
+      "type": "integer"
+      "format": "int64"
+      "minimum": 1
+      "maximum": 9007199254740991
+      "description": "ID numérico positivo asignado por el sistema propietario; límite interoperable exacto en JavaScript."
+    "Error":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "code"
+        - "message"
+      "properties":
+        "code":
+          "type": "string"
+          "minLength": 1
+        "message":
+          "type": "string"
+          "minLength": 1
+    "QuotationStatus":
+      "type": "string"
+      "enum":
+        - "DRAFT"
+        - "ACCEPTED"
+        - "REJECTED"
+        - "EXPIRED"
+        - "CANCELLED"
+      "description": "Estados propuestos por Manufactura; sujetos a acuerdo."
+    "QuotationItemRequest":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "product_id"
+        - "quantity"
+      "properties":
+        "product_id":
+          "$ref": "#/components/schemas/Id"
+        "quantity":
+          "type": "integer"
+          "minimum": 1
+    "QuotationItem":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "product_id"
+        - "quantity"
+        - "unit_price"
+        - "subtotal"
+      "properties":
+        "product_id":
+          "$ref": "#/components/schemas/Id"
+        "quantity":
+          "type": "integer"
+          "minimum": 1
+        "unit_price":
+          "type": "number"
+          "minimum": 0
+          "multipleOf": 0.01
+          "description": "Importe decimal con dos posiciones; calcular con aritmética decimal, no binaria."
+        "subtotal":
+          "type": "number"
+          "minimum": 0
+          "multipleOf": 0.01
+          "description": "Importe decimal con dos posiciones; calcular con aritmética decimal, no binaria."
+    "CotizacionManufacturaRequest":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "contract_id"
+        - "items"
+      "properties":
+        "contract_id":
+          "$ref": "#/components/schemas/Id"
+        "items":
+          "type": "array"
+          "minItems": 1
+          "items":
+            "$ref": "#/components/schemas/QuotationItemRequest"
+    "CotizacionManufactura":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "quotation_id"
+        - "contract_id"
+        - "status"
+        - "currency"
+        - "items"
+        - "total"
+      "properties":
+        "quotation_id":
+          "$ref": "#/components/schemas/Id"
+        "contract_id":
+          "$ref": "#/components/schemas/Id"
+        "status":
+          "$ref": "#/components/schemas/QuotationStatus"
+        "currency":
+          "type": "string"
+          "pattern": "^[A-Z]{3}$"
+          "description": "Código de moneda de tres letras; GTQ es solo el ejemplo."
+        "items":
+          "type": "array"
+          "minItems": 1
+          "items":
+            "$ref": "#/components/schemas/QuotationItem"
+        "total":
+          "type": "number"
+          "minimum": 0
+          "multipleOf": 0.01
+          "description": "Importe decimal con dos posiciones; calcular con aritmética decimal, no binaria."
+  "parameters":
+    "QuotationId":
+      "name": "quotation_id"
+      "in": "path"
+      "required": true
+      "description": "ID de cotización en este nodo."
+      "schema":
+        "$ref": "#/components/schemas/Id"
+    "ContractIdQuery":
+      "name": "contract_id"
+      "in": "query"
+      "required": false
+      "description": "Contrato existente, opcional."
+      "schema":
+        "$ref": "#/components/schemas/Id"
+    "StatusQuery":
+      "name": "status"
+      "in": "query"
+      "required": false
+      "description": "Estado provisional."
+      "schema":
+        "$ref": "#/components/schemas/QuotationStatus"
+  "responses":
+    "BadRequest":
+      "description": "JSON, tipos, campos o rango de fechas inválidos."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "BAD_REQUEST"
+            "message": "JSON, tipos, campos o rango de fechas inválidos."
+    "Unauthorized":
+      "description": "Solo aplica si se acuerda exigir autenticación."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "UNAUTHORIZED"
+            "message": "Solo aplica si se acuerda exigir autenticación."
+    "NotFound":
+      "description": "El recurso solicitado por su ruta no existe."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "NOT_FOUND"
+            "message": "El recurso solicitado por su ruta no existe."
+    "Conflict":
+      "description": "Conflicto con el estado o las reglas comerciales."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "CONFLICT"
+            "message": "Conflicto con el estado o las reglas comerciales."
+    "InvalidReference":
+      "description": "Una referencia no existe o no pertenece a la entidad indicada."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "INVALID_REFERENCE"
+            "message": "Una referencia no existe o no pertenece a la entidad indicada."
+    "InternalServerError":
+      "description": "Error interno sin exponer detalles técnicos."
+      "content":
+        "application/json":
+          "schema":
+            "$ref": "#/components/schemas/Error"
+          "example":
+            "code": "INTERNAL_SERVER_ERROR"
+            "message": "Error interno sin exponer detalles técnicos."
+  "headers":
+    "Location":
+      "description": "URI relativa del recurso creado, resoluble desde el origen del servidor. Debe incluir el prefijo real de la API."
+      "schema":
+        "type": "string"
+      "example": "/api/cotizacion_manufactura/2001"
+  "securitySchemes":
+    "bearerAuth":
+      "type": "http"
+      "scheme": "bearer"
+      "bearerFormat": "JWT"
+      "description": "Definición preparada. No se exige en este borrador; pendiente de acuerdo."
